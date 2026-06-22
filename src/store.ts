@@ -95,18 +95,31 @@ export const useMenuStore = create<MenuStore>()(
 
       addCombo: (combo) => {
         const id = genId('combo')
-        const totalOriginal = combo.dishIds.reduce((sum, did) => {
-          const dish = defaultDishes.find((d) => d.id === did)
-          return sum + (dish?.price ?? 0)
-        }, 0)
-        const savings = totalOriginal - combo.comboPrice
-        set((s) => ({ combos: [...s.combos, { ...combo, id, savings }] }))
+        set((s) => {
+          const dishMap = new Map(s.dishes.map((d) => [d.id, d]))
+          const totalOriginal = combo.dishIds.reduce((sum, did) => {
+            const dish = dishMap.get(did)
+            return sum + (dish?.price ?? 0)
+          }, 0)
+          const savings = Math.max(0, totalOriginal - combo.comboPrice)
+          return { combos: [...s.combos, { ...combo, id, savings }] }
+        })
       },
 
       updateCombo: (id, updates) =>
-        set((s) => ({
-          combos: s.combos.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-        })),
+        set((s) => {
+          const combos = s.combos.map((c) => (c.id === id ? { ...c, ...updates } : c))
+          const updated = combos.find((c) => c.id === id)
+          if (updated) {
+            const dishMap = new Map(s.dishes.map((d) => [d.id, d]))
+            const totalOriginal = updated.dishIds.reduce((sum, did) => {
+              const dish = dishMap.get(did)
+              return sum + (dish?.price ?? 0)
+            }, 0)
+            updated.savings = Math.max(0, totalOriginal - updated.comboPrice)
+          }
+          return { combos }
+        }),
 
       deleteCombo: (id) =>
         set((s) => ({ combos: s.combos.filter((c) => c.id !== id) })),

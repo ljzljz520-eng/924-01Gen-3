@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
-import { Flame, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp, X, Check, DollarSign } from 'lucide-react'
+import { Flame, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp, X, Check, DollarSign, Package } from 'lucide-react'
 import { useMenuStore } from '@/store'
 import { ALLERGEN_LABELS, SPICE_LABELS } from '@/types'
-import type { Dish, Allergen } from '@/types'
+import type { Dish, Allergen, Combo } from '@/types'
 
 const EMPTY_DISH: Omit<Dish, 'id'> = { name: '', price: 0, category: '', spiciness: 0, allergens: [], description: '' }
 
@@ -190,13 +190,118 @@ function BatchPanel({ ids, onClose }: { ids: string[]; onClose: () => void }) {
   )
 }
 
+function ComboDrawer({ open, combo, onSave, onClose }: {
+  open: boolean
+  combo: { id?: string; name: string; dishIds: string[]; comboPrice: number }
+  onSave: (c: { name: string; dishIds: string[]; comboPrice: number }) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState(combo)
+  const dishes = useMenuStore((s) => s.dishes)
+
+  if (!open) return null
+
+  const toggleDish = (id: string) => {
+    setForm((p) => ({
+      ...p,
+      dishIds: p.dishIds.includes(id) ? p.dishIds.filter((x) => x !== id) : [...p.dishIds, id],
+    }))
+  }
+
+  const selectedTotal = form.dishIds.reduce((sum, did) => {
+    const d = dishes.find((x) => x.id === did)
+    return sum + (d?.price ?? 0)
+  }, 0)
+
+  const savings = Math.max(0, selectedTotal - form.comboPrice)
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/30" />
+      <div
+        className="relative w-full max-w-md bg-white shadow-2xl overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-4">
+          <h2 className="font-serif text-lg font-bold text-brand-black">{combo.id ? '编辑套餐' : '添加套餐'}</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-brand-cream hover:text-brand-black"><X size={20} /></button>
+        </div>
+        <div className="space-y-5 px-6 py-5">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-600">套餐名称</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="如：双人套餐"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red/30"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-600">包含菜品</label>
+            <p className="text-xs text-gray-400 mb-2">点击选择要加入套餐的菜品</p>
+            <div className="max-h-52 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+              {dishes.map((d) => {
+                const checked = form.dishIds.includes(d.id)
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => toggleDish(d.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${checked ? 'bg-brand-red/5' : 'hover:bg-gray-50'}`}
+                  >
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors ${checked ? 'border-brand-red bg-brand-red text-white' : 'border-gray-300'}`}>
+                      {checked && <Check size={10} />}
+                    </span>
+                    <span className="flex-1 text-sm text-brand-black truncate">{d.name}</span>
+                    <span className="text-xs text-gray-400">¥{d.price}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {form.dishIds.length > 0 && (
+              <p className="mt-1.5 text-xs text-gray-500">已选 {form.dishIds.length} 道菜品，原价合计 ¥{selectedTotal}</p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-600">套餐价格 (¥)</label>
+            <input
+              type="number"
+              min={0}
+              value={form.comboPrice}
+              onChange={(e) => setForm((p) => ({ ...p, comboPrice: Number(e.target.value) || 0 }))}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red/30"
+            />
+            {form.dishIds.length > 0 && form.comboPrice > 0 && (
+              <p className={`mt-1.5 text-xs font-medium ${savings > 0 ? 'text-brand-green' : savings === 0 ? 'text-gray-400' : 'text-brand-red'}`}>
+                {savings > 0 ? `顾客可省 ¥${savings}` : savings === 0 ? '套餐价等于原价' : '套餐价高于原价'}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="sticky bottom-0 border-t bg-white px-6 py-4 flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">取消</button>
+          <button
+            onClick={() => { if (form.name.trim() && form.dishIds.length > 0) onSave({ name: form.name, dishIds: form.dishIds, comboPrice: form.comboPrice }) }}
+            disabled={!form.name.trim() || form.dishIds.length === 0}
+            className="flex-1 rounded-lg bg-brand-red py-2 text-sm font-medium text-white hover:bg-brand-red-hover disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MenuEditor() {
-  const { dishes, combos, categories, addDish, updateDish, deleteDish, addCombo, deleteCombo } = useMenuStore()
+  const { dishes, combos, categories, addDish, updateDish, deleteDish, addCombo, updateCombo, deleteCombo } = useMenuStore()
   const [search, setSearch] = useState('')
   const [activeCat, setActiveCat] = useState('all')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingDish, setEditingDish] = useState<Omit<Dish, 'id'> & { id?: string }>(EMPTY_DISH)
   const [comboOpen, setComboOpen] = useState(false)
+  const [comboDrawerOpen, setComboDrawerOpen] = useState(false)
+  const [editingCombo, setEditingCombo] = useState<{ id?: string; name: string; dishIds: string[]; comboPrice: number }>({ name: '', dishIds: [], comboPrice: 0 })
   const [batchOpen, setBatchOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
@@ -220,6 +325,20 @@ export default function MenuEditor() {
     if (editingDish.id) updateDish(editingDish.id, form)
     else addDish(form)
     setDrawerOpen(false)
+  }
+
+  const openAddCombo = () => {
+    setEditingCombo({ name: '', dishIds: [], comboPrice: 0 })
+    setComboDrawerOpen(true)
+  }
+  const openEditCombo = (c: Combo) => {
+    setEditingCombo({ id: c.id, name: c.name, dishIds: c.dishIds, comboPrice: c.comboPrice })
+    setComboDrawerOpen(true)
+  }
+  const handleSaveCombo = (data: { name: string; dishIds: string[]; comboPrice: number }) => {
+    if (editingCombo.id) updateCombo(editingCombo.id, data)
+    else addCombo(data)
+    setComboDrawerOpen(false)
   }
 
   return (
@@ -292,23 +411,24 @@ export default function MenuEditor() {
                     <div className="flex items-start justify-between">
                       <h3 className="font-serif font-semibold text-brand-black">{combo.name}</h3>
                       <div className="flex gap-1">
+                        <button onClick={() => openEditCombo(combo)} className="rounded-lg p-1.5 text-gray-400 hover:bg-brand-cream hover:text-brand-amber"><Pencil size={15} /></button>
                         <button onClick={() => deleteCombo(combo.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"><Trash2 size={15} /></button>
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {comboDishes.map((d) => (
+                      {comboDishes.length > 0 ? comboDishes.map((d) => (
                         <span key={d.id} className="rounded-md bg-brand-cream px-2 py-0.5 text-xs text-gray-600">{d.name}</span>
-                      ))}
+                      )) : <span className="text-xs text-gray-300">未选择菜品</span>}
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm">
                       <span className="font-bold text-brand-red">¥{combo.comboPrice}</span>
-                      <span className="rounded-full bg-brand-green-light px-2.5 py-0.5 text-xs font-medium text-brand-green">省 ¥{combo.savings}</span>
+                      {combo.savings > 0 && <span className="rounded-full bg-brand-green-light px-2.5 py-0.5 text-xs font-medium text-brand-green">省 ¥{combo.savings}</span>}
                     </div>
                   </div>
                 )
               })}
               {combos.length === 0 && <p className="text-sm text-gray-400">暂无套餐，点击下方按钮添加</p>}
-              <button onClick={() => addCombo({ name: '新套餐', dishIds: [], comboPrice: 0 })} className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 py-6 text-sm text-gray-400 hover:border-brand-red hover:text-brand-red transition-colors">
+              <button onClick={openAddCombo} className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 py-6 text-sm text-gray-400 hover:border-brand-red hover:text-brand-red transition-colors">
                 <Plus size={18} />添加套餐
               </button>
             </div>
@@ -317,6 +437,7 @@ export default function MenuEditor() {
       </div>
 
       <DishDrawer open={drawerOpen} dish={editingDish} onSave={handleSave} onClose={() => setDrawerOpen(false)} />
+      <ComboDrawer open={comboDrawerOpen} combo={editingCombo} onSave={handleSaveCombo} onClose={() => setComboDrawerOpen(false)} />
     </div>
   )
 }

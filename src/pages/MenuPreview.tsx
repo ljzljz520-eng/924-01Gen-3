@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Utensils, Smartphone, QrCode } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useMenuStore } from '@/store'
 import { ALLERGEN_LABELS, SPICE_LABELS } from '@/types'
 import type { Dish, Allergen } from '@/types'
@@ -43,37 +44,6 @@ function AllergenDots({ allergens }: { allergens: Allergen[] }) {
         <span key={a} className={`w-1.5 h-1.5 rounded-full ${ALLERGEN_COLORS[a]}`} title={ALLERGEN_LABELS[a]} />
       ))}
     </span>
-  )
-}
-
-function QRPlaceholder({ size = 64 }: { size?: number }) {
-  const cells = 9
-  const cellSize = size / cells
-  return (
-    <div
-      className="relative"
-      style={{ width: size, height: size }}
-    >
-      {Array.from({ length: cells * cells }).map((_, i) => {
-        const row = Math.floor(i / cells)
-        const col = i % cells
-        const isCorner = (row < 3 && col < 3) || (row < 3 && col >= cells - 3) || (row >= cells - 3 && col < 3)
-        const isFilled = isCorner || ((row + col) % 3 === 0) || ((row * col) % 7 < 3)
-        return (
-          <div
-            key={i}
-            className="absolute"
-            style={{
-              left: col * cellSize,
-              top: row * cellSize,
-              width: cellSize,
-              height: cellSize,
-              backgroundColor: isFilled ? '#1A1A1A' : '#FFFFFF',
-            }}
-          />
-        )
-      })}
-    </div>
   )
 }
 
@@ -291,7 +261,13 @@ function TableQRPreview() {
             >
               <div className="absolute inset-2 border border-brand-red/20 rounded-sm pointer-events-none" />
               <div className="flex justify-center mb-2">
-                <QRPlaceholder size={80} />
+                <QRCodeSVG
+                  value={`https://weidao.menu/order?table=${no}`}
+                  size={80}
+                  level="M"
+                  bgColor="#FFFFFF"
+                  fgColor="#1A1A1A"
+                />
               </div>
               <p className="font-serif text-center text-xs text-brand-black tracking-widest mt-2">味道小馆</p>
               <p className="text-center text-[9px] text-brand-red/70 mt-0.5">扫码点餐</p>
